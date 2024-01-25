@@ -1,0 +1,12 @@
+beautifulsoup4>=4.9
+requests==2.31.0
+setuptools~=68.2.0
+brotli~=1.0.9
+pytest==7.4.0
+randomname~=0.2.1
+urllib3==1.26.7
+
+pydig~=0.4.0
+dmarc~=1.0.3
+python-dotenv~=1.0.1
+Jinja2~=3.1.3
