@@ -13,6 +13,37 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 import html2text
 
 
+def check_data_in_html_el(html_content: str):
+    """
+    Check the presence of specific data attributes in HTML content
+
+    Args:
+        html_content (str): The HTML content to check.
+
+    Returns:
+        dict: A dictionary containing the count of each data attribute found.
+            - "base64": The count of base64 encoded images ("data:image/jpeg;base64,").
+            - "cid": The count of images with the attribute "cid:smtpymailer-image" in the source.
+            - "data-smtpymailer": The count of images with the data attribute data-smtpymailer in the source.
+
+    Example:
+        >>> html_content = '<img src="data:image/jpeg;base64,abc123" /> <img src="cid:smtpymailer-image1.jpg" />'
+        >>> check_data_in_html_el(html_content)
+        {'base64': 1, 'cid': 1, 'data-smtpymailer': 0}
+    """
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    data_found = {"base64": 0, "cid": 0, "data-smtpymailer": 0}
+
+    for img in soup.find_all("img"):
+        src = img.get("src", "")
+        data_found["base64"] += 1 if ";base64," in src else 0
+        data_found["cid"] += 1 if "cid:smtpymailer-image" in src else 0
+        data_found["data-smtpymailer"] += 1 if "data-smtpymailer" in img.attrs else 0
+
+    return data_found
+
+
 def process_img_element(
     img: Tag,
     idx: int,
@@ -41,7 +72,7 @@ def process_img_element(
         response.raise_for_status()
 
     except requests.RequestException:
-        #if the request fails, ignore the element and leave the original src
+        # if the request fails, ignore the element and leave the original src
         return
 
     img_data = response.content
@@ -62,9 +93,10 @@ def process_img_element(
     if convert_to_base64:
         base64_data = base64.b64encode(img_data).decode("utf-8")
         img["src"] = f"data:image/{img_ext};base64,{base64_data}"
+        img["data-smtpymailer"] = ""
 
     elif email_message is not None:
-        cid = f"image{idx}.{img_ext}"
+        cid = f"smtpymailer-image{idx}.{img_ext}"
         maintype, subtype = content_type.split("/")
 
         # Create an instance of MIMEImage
@@ -75,6 +107,7 @@ def process_img_element(
         # Attach it to the email message
         email_message.attach(mime_image)
         img["src"] = f"cid:{cid}"
+        img["data-smtpymailer"] = ""
 
 
 def convert_img_elements_to_base64(html_content: str) -> str:
