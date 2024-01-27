@@ -32,22 +32,23 @@ pip install smtpymailer
 Create an instance of `SmtpyMailer` with your sender email and name. The mail server details can be passed as keyword
 arguments or sourced from environment variables or a `.env` file.
 
-```python
-from smtpymailer import SmtpMailer
-mailer = SmtpMailer(sender_email="foo@bar.com", sender_name="Foo Bar")
-```
-
 ### Environment Variables
 
 The following environment variables can be set or added to a `.env` file in your project root.
 Alternatively you can pass as **kwargs to the `SmtpyMailer` class but this is not advised.
 
-- `MAIL_SERVER`
-- `MAIL_PORT`
-- `MAIL_USE_TLS`
-- `MAIL_USERNAME`
-- `MAIL_PASSWORD`
-- `MAIL_DKIM_SELECTOR`
+- `MAIL_SERVER`: The mail server hostname.
+- `MAIL_PORT`: The mail server port.
+- `MAIL_USE_TLS`: Whether to use TLS or not.
+- `MAIL_USERNAME`: The mail server username.
+- `MAIL_PASSWORD`: The mail server password.
+- `MAIL_DKIM_SELECTOR`: The DKIM selector of the domain you are sending from. (This is used to validate your ability to send from the domain).
+
+
+```python
+from smtpymailer import SmtpMailer
+mailer = SmtpMailer(sender_email="foo@bar.com", sender_name="Foo Bar")
+```
 
 ### Sending an Email
 
