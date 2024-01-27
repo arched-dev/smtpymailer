@@ -1,16 +1,21 @@
 import base64
 import datetime
+import hashlib
 import os
 import re
+import uuid
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from typing import Optional, List
+from io import BytesIO
+from mimetypes import guess_type
+from typing import Optional, List, Union
 from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import html2text
+from PIL import Image
 
 
 def check_data_in_html_el(html_content: str):
@@ -44,6 +49,63 @@ def check_data_in_html_el(html_content: str):
     return data_found
 
 
+def change_image_type(element: "Tag", mime_type: str, img_data: bytes):
+    """
+    Optionally changes the image type of the given image data, based on data-attributes in the HTML img element.
+    See Notes for more information.
+
+    Args:
+        element (Tag): The HTML img element.
+        mime_type (str): The MIME type of the image.
+        img_data (bytes): The image data.
+
+    Returns:
+        tuple: A tuple containing the converted image data and the converted MIME type.
+
+    Notes:
+        I found a wierd bug in gmail showing some CID inline png images as `noname` attachments, I had 4 CID
+        attachments and only one was showing as `noname`. This was in the gmail preview only, not visible when the
+        email was viewed.
+
+        To fix, I converted that image into a jpg and the 'noname' attachment disappeared. There is very little online
+        about this, but possible a bug in gmail.
+
+        To use this feature, add the following data attributes to the img element:
+
+            * data-convert="jpg" - Converts the image type if it's not already. Can be "png", "jpg", or "gif".
+            * data-format="rgb" (optional): The pixel format of the image. Defaults to "RGB". Can also be "RGBA".
+
+        i.e  <img data-convert="jpg" data-format="rgb" src="https://www.example.com/image.png"/>
+
+    """
+
+    if "data-convert" in element.attrs:
+        convert_to_type = element.get("data-convert").lower()
+        if convert_to_type not in ["png", "jpg", "gif", "jpeg"]:
+            raise ValueError(
+                f"Invalid value for data-convert attribute: {convert_to_type}"
+            )
+        pixel_format = "RGB"
+        if "data-format" in element.attrs:
+            pixel_format = element.get("data-format").lower()
+            if pixel_format not in ["rgb", "rgba"]:
+                raise ValueError(
+                    f"Invalid value for data-format attribute: {pixel_format}"
+                )
+
+        _, file_format = mime_type.split("/")
+        file_format = file_format.replace("jpeg", "jpg").lower()
+
+        if convert_to_type != file_format:
+            img = Image.open(BytesIO(img_data))
+            with BytesIO() as img_io:
+                img.convert(pixel_format.upper()).save(img_io, convert_to_type.upper())
+                img_data = img_io.getvalue()  # Update img_data with JPEG data
+                mime_type = f'image/{convert_to_type.lower().replace("jpg","jpeg")}'  # Update content_type to JPEG
+
+    return img_data, mime_type
+
+
 def process_img_element(
     img: Tag,
     idx: int,
@@ -51,8 +113,11 @@ def process_img_element(
     email_message: MIMEMultipart = None,
 ):
     """
-    Process and manipulate HTML img elements, if the request fails the element is ignored and left with the
-    original src.
+    Process and manipulate HTML img elements, converting the image to either CID attachments or base64 encoded.
+    If the request fails the element is ignored and left with the original src.
+
+    Optionally you can convert the original image type when using CID attachments. See Notes `change_image_type` for
+    more information.
 
     Args:
         img (Tag): The HTML img element to process.
@@ -64,6 +129,8 @@ def process_img_element(
     """
 
     src = img.get("src", "")
+    content_type, _ = guess_type(src)
+
     if not src.startswith(("http://", "https://")):
         return
 
@@ -76,27 +143,18 @@ def process_img_element(
         return
 
     img_data = response.content
-    parsed_url = urlparse(src)
-    img_ext = os.path.splitext(parsed_url.path)[1].lstrip(".")
-    image_content_types = {
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "png": "image/png",
-        "gif": "image/gif",
-        "svg": "image/svg+xml",
-        "bmp": "image/bmp",
-        "webp": "image/webp",
-    }
-
-    content_type = image_content_types.get(img_ext, "image/jpeg")
+    img_data, content_type = change_image_type(img, content_type, img_data)
 
     if convert_to_base64:
+        parsed_url = urlparse(src)
+        img_ext = os.path.splitext(parsed_url.path)[1].lstrip(".")
         base64_data = base64.b64encode(img_data).decode("utf-8")
         img["src"] = f"data:image/{img_ext};base64,{base64_data}"
         img["data-smtpymailer"] = ""
 
     elif email_message is not None:
-        cid = f"smtpymailer-image{idx}.{img_ext}"
+        hash_object = hashlib.md5(img_data)
+        cid = hash_object.hexdigest() + f"{idx}"
         maintype, subtype = content_type.split("/")
 
         # Create an instance of MIMEImage
@@ -242,14 +300,17 @@ def render_html_template(
 
 def alter_img_html(message, html_content, alter_img_src: Optional = None):
     """
-    Alters the HTML content of an email message by converting image elements to base64 encoding or attaching images as CID (Content-ID).
+    Alters the HTML content of an email message by converting image elements to base64 encoding or attaching images
+    as CID (Content-ID).
 
-    This method modifies the HTML content based on the specified `alter_img_src` parameter. It either converts image elements in the HTML content to base64 encoding or attaches images as CID.
+    This method modifies the HTML content based on the specified `alter_img_src` parameter. It either converts image
+    elements in the HTML content to base64 encoding or attaches images as CID.
 
     Args:
-        message (EmailMessage): The email message object to be modified.
+        message (MIMEMultipart): The email message object to be modified.
         html_content (str): The HTML content of the email.
-        alter_img_src (Optional[str]): The source of the image alteration. It can be "base64" or "cid". If None, no alteration is performed.
+        alter_img_src (Optional[str]): The source of the image alteration. It can be "base64" or "cid". If None,
+            no alteration is performed.
 
     Returns:
         str: The altered HTML content with image elements modified according to `alter_img_src`.
@@ -258,6 +319,9 @@ def alter_img_html(message, html_content, alter_img_src: Optional = None):
         This function does not explicitly raise any exceptions.
 
     Examples:
+        To do nothing
+        >>> alter_img_html(message, html_content)
+
         To convert image elements in HTML content to base64 encoding:
         >>> alter_img_html(message, html_content, alter_img_src="base64")
 
@@ -277,21 +341,26 @@ def alter_img_html(message, html_content, alter_img_src: Optional = None):
 def make_html_content(
     html_content: Optional[str] = None,
     template: Optional[str] = None,
-    template_directory: Optional[List[str]] = None,
+    template_directory: Optional[Union[str, List[str]]] = None,
     **kwargs,
 ):
     """
-    Adds HTML content to the email message.
+    Adds HTML content to the email message. This function either directly uses provided HTML content or renders HTML content
+    from a specified template.
 
     Args:
-        html_content: Optional string containing the HTML content of the email. Defaults to None.
-        template: Optional string representing the template to be used for rendering the HTML content. Defaults to None.
-        template_directory: Optional list of strings representing the directories to search for the template file.
+        html_content (Optional[str]): A string containing the HTML content of the email. If this is provided, the function
+            will use it directly. Defaults to None.
+        template (Optional[str]): A string representing the name of the template file to be used for rendering the HTML
+            content. This is used if 'html_content' is not provided. Defaults to None.
+        template_directory (Optional[Union[str, List[str]]]): A string or list of strings representing the directories
+            to search for the template file. This is used in conjunction with 'template' to render the HTML content.
             Defaults to None.
-        **kwargs: Additional keyword arguments that can be passed to the template rendering function.
+        **kwargs: Additional keyword arguments that are passed to the template rendering function.
 
     Returns:
-        The modified message object with the HTML content added.
+        str: The HTML content that will be used in the email. This could be the provided 'html_content' or content rendered
+             from the specified template.
 
     """
     if not html_content:

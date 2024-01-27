@@ -1,1 +1,1 @@
-from .mailer import SmtpMailer
+from .mailer import SmtpMailer, Contact

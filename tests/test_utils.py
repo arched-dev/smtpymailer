@@ -11,9 +11,98 @@ from smtpymailer.utils import (
     convert_bool,
     find_project_root,
     build_all_recipients_and_validate,
+    construct_mime_object,
 )
 
 from email_validator import EmailNotValidError
+from email.mime.application import MIMEApplication
+from email.mime.audio import MIMEAudio
+from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
+from email.mime.text import MIMEText
+
+class TestCreateMime(unittest.TestCase):
+
+    # Should return a MIMEImage object if the attachment is an image
+    def test_image(self):
+        path = os.path.abspath("./assets/dog.jpg")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEImage))
+
+    # Should return a MIMEApplication object if the attachment is a docx file
+    def test_docx(self):
+        path = os.path.abspath("./assets/dog.docx")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEApplication))
+
+    # Should return a MIMEApplication object if the attachment is a xlsx file
+    def test_xlsx(self):
+        path = os.path.abspath("./assets/dog.xlsx")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEApplication))
+
+    # Should return a MIMEApplication object if the attachment is an ods file
+    def test_ods(self):
+        path = os.path.abspath("./assets/dog.ods")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEApplication))
+
+    # Should return a MIMEApplication object if the attachment is an odt file
+    def test_odt(self):
+        path = os.path.abspath("./assets/dog.odt")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEApplication))
+
+    # Should return a MIMEApplication object if the attachment is a pdf file
+    def test_pdf(self):
+        path = os.path.abspath("./assets/dog.pdf")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEApplication))
+
+    # Should return a MIMEAudio object if the attachment is a pdf file
+    def test_mp3(self):
+        path = os.path.abspath("./assets/dog.mp3")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEAudio))
+
+    # Should return a MIMEText object if the attachment is a txt file
+    def test_txt(self):
+        path = os.path.abspath("./assets/dog.txt")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEText))
+
+    # Should return a MIMEApplication object if the attachment is a zip file
+    def test_zip(self):
+        path = os.path.abspath("./assets/dog.zip")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEApplication))
+
+    # Should return a MIMEBase object if the attachment is a mp4 file
+    def test_base(self):
+        path = os.path.abspath("./assets/dog.mp4")
+        with open(path, "rb") as attachment:
+            part = construct_mime_object(path, attachment)
+
+        self.assertTrue(isinstance(part, MIMEBase))
+
 
 
 class TestHtmlConversion(unittest.TestCase):
@@ -159,10 +248,7 @@ class TestFindProjectRoot(unittest.TestCase):
         self.assertIsNone(result)
 
 
-
-
 class TestBuildAllRecipientsAndValidate(unittest.TestCase):
-
     #  Should return a list of all recipients after validation
     def test_with_valid_recipients(self):
         recipients = ["test1@example.com", "test2@example.com"]
@@ -218,6 +304,9 @@ class TestBuildAllRecipientsAndValidate(unittest.TestCase):
         bcc_recipients = ["invalidemail"]
         with self.assertRaises(EmailNotValidError):
             build_all_recipients_and_validate(recipients, None, bcc_recipients)
+
+
+
 
 if __name__ == "__main__":
     unittest.main()

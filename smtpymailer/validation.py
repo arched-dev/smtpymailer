@@ -57,11 +57,8 @@ def validate_dkim_record(dkim_record: str) -> Union[Optional[bytes], bool]:
 
     # Extract and decode the public key
     public_key_encoded = match.group(5)[2:]  # Correctly remove 'p='
-    try:
-        return True if base64.b64decode(public_key_encoded) else False
 
-    except binascii.Error:
-        return False
+    return True if base64.b64decode(public_key_encoded) else False
 
 
 def get_address_type(address):
@@ -131,15 +128,23 @@ def is_ip_in_network(ip: str, network: str) -> bool:
 
     Returns:
         bool: True if the IP address is in the network, False otherwise.
+
+    Raises:
+        TypeError: If the IP address or network is invalid.
+        ValueError: if the IP or network is not a string.
+
     """
+    if not isinstance(ip, str) or not isinstance(network, str):
+        raise TypeError("Invalid input parameters")
+
     try:
+
         ip_obj = ipaddress.ip_address(ip)
-        network_obj = ipaddress.ip_network(
-            network, strict=False
-        )  # Allow matching IPv6 networks
+        network_obj = ipaddress.ip_interface(network).network
         return ip_obj in network_obj
+
     except ValueError:
-        return False  # Invalid IP or network, return False
+        raise ValueError("Invalid IP or network")
 
 
 def spf_check(
@@ -150,13 +155,16 @@ def spf_check(
 ):
     """
     Args:
-        spf_record (str): The SPF record to check.
-        ipv4 (Optional[str]): The IPv4 address to check. Default is None.
-        ipv6 (Optional[str]): The IPv6 address to check. Default is None.
-        domain (Optional[str]): The domain to check. Default is None.
+        spf_record: The SPF record to be checked.
+        ipv4: Optional parameter for the IPv4 addresses to be checked against the SPF record. It can be a single
+            IPv4 address or a list of IPv4 addresses.
+        ipv6: Optional parameter for the IPv6 addresses to be checked against the SPF record. It can be a single
+            IPv6 address or a list of IPv6 addresses.
+        domain: Optional parameter for the domain name to be checked against the SPF record.
 
     Returns:
-        bool: True if the IP or domain is authorized by the SPF record, False otherwise.
+        Returns True if the SPF record authorizes the provided IPv4 addresses, IPv6 addresses, or the domain.
+        Returns False if the SPF record explicitly disallows them.
 
     Raises:
         ValueError: If the SPF record is invalid.
@@ -184,7 +192,7 @@ def spf_check(
         val += add or []
 
         return_val = list(set(val))
-        return return_val if return_val else None
+        return return_val if return_val else []
 
     if (not ipv4 or not ipv6) and domain:
         _ipv4, _ipv6 = resolve_domain(domain)
@@ -213,7 +221,7 @@ def spf_check(
                     if spf_check(str(rdata), ipv4, ipv6, domain):
                         return True
             except Exception as e:
-                raise Exception(f"DNS query failed: {e}")
+                return False
 
         elif part.startswith("ip4:"):
             network = part.split(":")[1]
@@ -235,10 +243,7 @@ def spf_check(
     if "-all" in parts:
         return False  # The IP or domain is not authorized
 
-    return True  # The SPF record does not explicitly disallow the IP or domain
-
-
-def _get_record_match(record):
+def get_dmarc_record_match(record):
     """
     Clean up the record and checks if it's a match.
 
@@ -259,16 +264,12 @@ def _get_record_match(record):
     for address in mailto_addresses:
         validate_user_email(address)
 
-    # Matching the record with the regex
-    try:
-        # Regular expression to validate DMARC record
-        dmarc_regex = re.compile(
-            r"^v=DMARC1;\s*((p=none|p=quarantine|p=reject|rua=mailto:[^;]+|ruf=mailto:[^;]+|pct=\d{1,3}|sp=none|sp=quarantine|sp=reject|aspf=r|aspf=s|adkim=r|adkim=s|fo=[01ds]|rf=afrf|rf=iodef|ri=\d+);?\s*)*\s*$",
-            re.IGNORECASE,
-        )
-        return dmarc_regex.fullmatch(clean_record)
-    except re.error as e:
-        raise ValueError(f"Invalid regular expression: {e}")
+    # Regular expression to validate DMARC record
+    dmarc_regex = re.compile(
+        r"^v=DMARC1;\s*((p=none|p=quarantine|p=reject|rua=mailto:[^;]+|ruf=mailto:[^;]+|pct=\d{1,3}|sp=none|sp=quarantine|sp=reject|aspf=r|aspf=s|adkim=r|adkim=s|fo=[01ds]|rf=afrf|rf=iodef|ri=\d+);?\s*)*\s*$",
+        re.IGNORECASE,
+    )
+    return dmarc_regex.fullmatch(clean_record)
 
 
 def validate_dmarc_record(record):
@@ -286,7 +287,7 @@ def validate_dmarc_record(record):
     assert isinstance(record, str), "The record must be a string."
 
     # Clean up and match the record
-    record_match = _get_record_match(record)
+    record_match = get_dmarc_record_match(record)
 
     # Check pct value if exists
     if record_match:

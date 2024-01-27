@@ -1,10 +1,6 @@
 import os
+import pathlib
 import smtplib
-from email import encoders
-from email.mime.application import MIMEApplication
-from email.mime.audio import MIMEAudio
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
@@ -25,6 +21,7 @@ from smtpymailer.utils import (
     recipients_to_str,
     build_all_recipients_and_validate,
     ensure_list,
+    construct_mime_object,
 )
 from smtpymailer.validation import (
     validate_user_email,
@@ -33,16 +30,6 @@ from smtpymailer.validation import (
     get_address_type,
     validate_dkim_record,
 )
-
-COMMON_APPLICATION_MIME_TYPES = [
-    "pdf",  # PDF documents
-    "msword",  # Microsoft Word documents (legacy .doc)
-    "vnd.openxmlformats-officedocument.wordprocessingml.document",  # Microsoft Word documents (.docx)
-    "vnd.ms-excel",  # Microsoft Excel documents (legacy .xls)
-    "vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # Microsoft Excel documents (.xlsx)
-    "vnd.ms-powerpoint",  # Microsoft PowerPoint presentations (legacy .ppt)
-    "vnd.openxmlformats-officedocument.presentationml.presentation",  # Microsoft PowerPoint presentations (.pptx)
-]
 
 
 class Contact:
@@ -139,12 +126,16 @@ def validate_send_email(
     """
     if not html_content or not template:
         if template:
-
             if not is_file_with_path(template) and not template_directory:
                 raise FileNotFoundError(
                     "Template file not found. Please provide either a full path to the template or a template file and template directory"
                 )
-            elif not is_file_with_path(template) and not any([is_file_with_path(os.path.join(x, template))for x in ensure_list(template_directory)]):
+            elif not is_file_with_path(template) and not any(
+                [
+                    is_file_with_path(os.path.join(x, template))
+                    for x in ensure_list(template_directory)
+                ]
+            ):
                 raise FileNotFoundError(
                     "Template file not found. Please provide either a full path to the template or a template file and template directory"
                 )
@@ -169,7 +160,7 @@ class SmtpMailer:
     """
 
     sender: Contact
-    html_content: Optional[str] = None
+    html_content: Optional[Union[str, pathlib.Path]] = None
     mail_server: str
     mail_port: int
     mail_use_tls: bool
@@ -194,6 +185,10 @@ class SmtpMailer:
         stored in the environment. `SmtpMailer` will check the `os.environ`, dotenv `.env` file in the root directory
         or can be supplied (**IF YOU HAVE TO**) as kwargs.
 
+        Notes:
+            If either the email fails to validate or the email server auth fails to validate, an exception will be
+            raised.
+
         Configuration Parameters:
             **MAIL_SERVER**: The hostname or IP address of the email server.
 
@@ -210,14 +205,8 @@ class SmtpMailer:
 
 
         Args:
-            recipients (str, list): Email address(es) to send to
-            subject (str): Email subject
             sender_email (str): Email address to send from
             sender_name (str): Name to use in email from field
-            html_content (str): HTML content of the email if not using a template
-            attachments (str, list): Path to file(s) to attach
-            template (str): Template filename(s) to render with jinja, if html_content is not supplied
-            **kwargs (dict): kwargs listed above
 
         """
 
@@ -240,27 +229,88 @@ class SmtpMailer:
             Exception: if the setup is not valid
 
         """
-
         resolver = pydig.Resolver(
             nameservers=["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4"]
         )
         sender_domain = self.sender.get_domain()
-        dmarc = resolver.query(f"_dmarc.{sender_domain}", "txt")
-        spf = [x for x in resolver.query(f"{sender_domain}", "TXT") if "spf" in x]
-        dkim = [
+
+        dmarc_records, spf_records, dkim_records = self._query_dns_records(
+            resolver, sender_domain
+        )
+
+        self._validate_records(sender_domain, dmarc_records, spf_records, dkim_records)
+
+    def _query_dns_records(self, resolver, sender_domain):
+        """
+        Args:
+            resolver: A DNS resolver object that allows querying of DNS records.
+            sender_domain: The domain name of the sender for which DNS records need to be queried.
+
+        Returns:
+            A tuple of three lists representing the DNS records:
+            - dmarc_records: A list of TXT records associated with the "_dmarc" subdomain of the sender domain.
+            - spf_records: A list of TXT records that contain "spf" keyword and are associated with the sender domain.
+            - dkim_records: A list of TXT records associated with the DKIM selector and "_domainkey" subdomain of the sender domain.
+
+        Note:
+            The returned lists may be empty if no matching DNS records are found.
+        """
+        dmarc_records = resolver.query(f"_dmarc.{sender_domain}", "TXT")
+        spf_records = [
+            x for x in resolver.query(f"{sender_domain}", "TXT") if "spf" in x
+        ]
+        dkim_records = [
             x
             for x in resolver.query(
                 f"{self.mail_dkim_selector}._domainkey.{sender_domain}", "TXT"
             )
             if "DKIM" in x
         ]
+        return dmarc_records, spf_records, dkim_records
 
-        if not dmarc or not validate_dmarc_record(dmarc[0]):
-            raise Exception(f"DMARC record for {sender_domain} is not valid")
-        if not spf or not spf_check(spf[0], **get_address_type(self.mail_server)):
-            raise Exception(f"SPF record for {sender_domain} is not valid")
-        if not dkim or not validate_dkim_record(dkim[0]):
-            raise Exception(f"DKIM record for {sender_domain} is not valid")
+    def _validate_records(
+        self,
+        sender_domain: str,
+        dmarc_records: list,
+        spf_records: list,
+        dkim_records: list,
+    ):
+        """
+        Args:
+            sender_domain (str): The domain of the sender.
+            dmarc_records (list): A list of DMARC records for the sender domain.
+            spf_records (list): A list of SPF records for the sender domain.
+            dkim_records (list): A list of DKIM records for the sender domain.
+
+        Raises:
+            Exception: If none of the DMARC records for the sender domain are valid.
+            Exception: If none of the SPF records for the sender domain are valid.
+            Exception: If none of the DKIM records for the sender domain are valid.
+        """
+
+        valid_dmarc = False
+        for record in dmarc_records:
+            if validate_dmarc_record(record):
+                valid_dmarc = True
+                break
+        if not valid_dmarc:
+            raise Exception(f"No valid DMARC record found for {sender_domain}")
+
+        valid_spf = False
+        for record in spf_records:
+            if spf_check(record, **get_address_type(self.mail_server)):
+                valid_spf = True
+                break
+        if not valid_spf:
+            raise Exception(f"No valid SPF record found for {sender_domain}")
+
+        valid_dkim = False
+        for record in dkim_records:
+            if validate_dkim_record(record):
+                valid_dkim = True
+                break
+        if not valid_dkim:
+            raise Exception(f"No valid DKIM record found for {sender_domain}")
 
     def _setup_email_server_auth(self, **kwargs):
         """
@@ -285,23 +335,19 @@ class SmtpMailer:
                 available sources (dotenv, environment variables, or kwargs).
 
             """
-            # Check in dotenv
-            value = os.getenv(key) or os.getenv(key.lower())
-            if value:
-                return value
 
-            # Check in environment variables
-            value = os.environ.get(key) or os.environ.get(key.lower())
-            if value:
-                return value
-
-            # Check in self.kwargs (case-insensitive)
+            # This is discouraged and only first, so I force a unit test to fail.
             key_lower = key.lower()
             for k, v in kwargs.items():
                 if k.lower() == key_lower:
                     return v
 
-            raise Exception(f"Could not find config value for {key}, cannot continue.")
+            # Check in dotenv
+            value = os.getenv(key) or os.getenv(key.lower())
+            if value:
+                return value
+
+            raise ValueError(f"Could not find config value for {key}, cannot continue.")
 
         # Configuration values
         self.mail_server = get_config("MAIL_SERVER")
@@ -321,7 +367,7 @@ class SmtpMailer:
         Returns:
             server: An instance of the server connection
         Raises:
-            Exception: If there is an error connecting to the mail server or invalid server connection details
+            ValueError: If there is an error connecting to the mail server or invalid server connection details
         """
         try:
             server = smtplib.SMTP(self.mail_server, self.mail_port)
@@ -330,23 +376,20 @@ class SmtpMailer:
             server.login(self.mail_username, self.mail_password)
             return server
         except:
-            raise Exception(
+            raise ValueError(
                 "Invalid server connection details, please check and try again"
             )
 
     def _send_message(self, recipients: list):
         """
         Sends a message if provided.
+
         Args:
-            message: An optional parameter of type EmailMessage representing the email message to be sent.
             recipients: a list of all email addresses to send email to including bcc emails that are not in the header.
 
         Returns:
             True if the message was sent successfully, otherwise raises an Exception.
         """
-        if not self.message:
-            raise ValueError("No message provided to send")
-
         try:
             with self._connect_to_server() as server:
                 server.sendmail(str(self.sender), recipients, self.message.as_string())
@@ -404,29 +447,25 @@ class SmtpMailer:
             None
 
         """
-        if not isinstance(attachments, list):
-            attachments = [attachments]
+        attachments = ensure_list(attachments)
+
         for attachment_file_path in attachments:
+
+            # Expand the user path, if needed and user has used ~/path/to/file
+            attachment_file_path = os.path.expanduser(attachment_file_path)
+
             if isinstance(attachment_file_path, str) and os.path.isfile(
                 attachment_file_path
             ):
-                attachment_file_path = os.path.expanduser(attachment_file_path)
-                mime_type, _ = guess_type(attachment_file_path)
-                if mime_type is None:
-                    mime_type = "application/octet-stream"
-                mime_main, mime_sub = mime_type.split("/", 1)
                 try:
                     with open(attachment_file_path, "rb") as attachment:
-                        part = self.construct_mime_object(
-                            mime_main, mime_sub, attachment
-                        )
+                        part = construct_mime_object(attachment_file_path, attachment)
                         part.add_header(
                             "Content-Disposition",
                             f"attachment; filename={os.path.basename(attachment_file_path)}",
                         )
                         self.message.attach(part)
-                except FileNotFoundError:
-                    raise Exception(f"File not found: {attachment_file_path}")
+
                 except PermissionError:
                     raise Exception(
                         f"Cannot open file. Check if the file is open in another program {attachment_file_path}"
@@ -436,32 +475,9 @@ class SmtpMailer:
                         f"Error opening attachment file {attachment_file_path}: {e}"
                     )
             else:
-                raise Exception(
+                raise FileNotFoundError(
                     f"Invalid or non existent attachment file path: {attachment_file_path}"
                 )
-
-    def construct_mime_object(self, mime_main, mime_sub, attachment):
-        """
-        Args:
-            mime_main (str): The main MIME type of the attachment.
-            mime_sub (str): The sub MIME type of the attachment.
-            attachment (file object): The attachment file object.
-
-        Returns:
-            MIMEBase or its subclasses: The constructed MIME object based on the provided MIME type and attachment.
-
-        """
-        if mime_main == "application" and mime_sub in COMMON_APPLICATION_MIME_TYPES:
-            return MIMEApplication(attachment.read(), _subtype=mime_sub)
-        elif mime_main == "image":
-            return MIMEImage(attachment.read(), _subtype=mime_sub)
-        elif mime_main == "audio":
-            return MIMEAudio(attachment.read(), _subtype=mime_sub)
-        else:
-            part = MIMEBase(mime_main, mime_sub)
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            return part
 
     def _make_plain_message(self, html_content):
         """

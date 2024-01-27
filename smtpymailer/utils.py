@@ -1,29 +1,41 @@
 import os
+from email import encoders
+from email.mime.application import MIMEApplication
+from email.mime.audio import MIMEAudio
+from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
+from email.mime.text import MIMEText
+from mimetypes import guess_type
 from pathlib import Path
 from typing import Optional, Union
-
-from email_validator import EmailNotValidError
 
 from smtpymailer.validation import validate_user_email
 
 
-def find_project_root(marker: Optional[Union[str, list]] = None) -> Optional[Path]:
+def find_project_root(
+    marker: Optional[Union[str, list]] = None, file_path: Optional = None
+) -> Optional[Path]:
     """
     Traverse up from the current path until a directory containing the marker is found.
 
     Args:
-        marker (Optional[Union[str, list]]): A string or a list of strings representing the file(s) or directory names to look for.
-                                             If not provided, defaults to [".git", "setup.py", "requirements.txt", "README.md"].
+        marker (Optional[Union[str, list]]): A string or a list of strings representing the file(s) or directory names
+            to look for.If not provided, defaults to [".git", "setup.py", "requirements.txt", "README.md"].
+        file_path (Optional[Path]): The __file__ of the calling module to start the search from. If not provided,
+            defaults to the path of the current file.
 
     Returns:
         Optional[Path]: The path to the directory containing the marker, or None if not found.
+
     """
     if marker is None:
         marker = [".git", "setup.py", "requirements.txt", "README.md"]
     elif isinstance(marker, str):
         marker = [marker]
 
-    current_file_path = Path(__file__).resolve()
+    current_file_path = (
+        Path(file_path).resolve() if file_path else Path(__file__).resolve()
+    )
     for parent in current_file_path.parents:
         if any((parent / m).exists() for m in marker):
             return parent
@@ -147,3 +159,53 @@ def build_all_recipients_and_validate(
         validate_and_extend(all_recipients, recipient_type)
 
     return all_recipients
+
+
+def construct_mime_object(path: str, attachment):
+    """
+    This function takes a file path and an attachment object, and constructs a MIME object
+    that represents the attachment. This is particularly useful when dealing with different
+    types of file attachments in email sending, as the constructed MIME object can be directly
+    attached to the email object.
+
+    Args:
+        path (str): The path of the file to be attached. This path is used to guess the MIME type
+            of the file, which helps in creating the appropriate type of MIME object.
+
+        attachment (file object): The file object to be attached. The content of this file is
+            read and placed in the payload of the MIME object.
+
+    Returns:
+        mime_part (object): The MIME object representing the attachment. This object can be
+            differentiating depending on the MIME type of the input file, it could be of type.
+
+                * MIMEApplication
+                * MIMEText
+                * MIMEImage
+                * MIMEAudio
+                * MIMEBase
+
+            The payload of this object contains the content of the input file, and its 'Content-Disposition' header
+            is set to designate it as an attachment with filename "example.txt".
+    """
+
+    mime_type, _ = guess_type(path)
+    mime_main, mime_sub = mime_type.split("/")
+
+    if mime_main == "application":
+        mime_part = MIMEApplication(attachment.read(), _subtype=mime_sub)
+    elif mime_main == "text":
+        mime_part = MIMEText(
+            attachment.read().decode("utf-8"), _subtype=mime_sub, _charset="utf-8"
+        )
+    elif mime_main == "image":
+        mime_part = MIMEImage(attachment.read(), _subtype=mime_sub)
+    elif mime_main == "audio":
+        mime_part = MIMEAudio(attachment.read(), _subtype=mime_sub)
+    else:
+        mime_part = MIMEBase(mime_main, mime_sub)
+        mime_part.set_payload(attachment.read())
+        encoders.encode_base64(mime_part)
+
+    mime_part.add_header("Content-Disposition", "attachment", filename="example.txt")
+    return mime_part
