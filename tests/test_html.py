@@ -136,10 +136,10 @@ class TestAttachImagesAsCid(unittest.TestCase):
         self.attach_images_as_cid_helper(images=10)
 
     def test_convert_cid_image_different_type(self):
-        with open("assets/1px.png", "rb") as file:
+        with open("./tests/assets/1px.png", "rb") as file:
             png_content = file.read()
 
-        with open("assets/1px.jpg", "rb") as file:
+        with open("./tests/assets/1px.jpg", "rb") as file:
             jpg_content = file.read()
 
         html_content = '<html><body><img data-convert="png" data-format="RGB" src="https://example.com/image.jpg"></body></html>'
