@@ -4,3 +4,6 @@ venv
 /.idea
 /.env
 /_hidden/
+/build/
+/dist/
+/.github/

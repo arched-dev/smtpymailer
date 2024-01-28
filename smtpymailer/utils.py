@@ -7,10 +7,48 @@ from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
 from mimetypes import guess_type
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Tuple
+from urllib.parse import urlparse
 
 from smtpymailer.validation import validate_user_email
 
+def is_get_local_file(file_path: str) -> Tuple[bool, Union[str, None]]:
+    """
+    Checks if the given file path is a local file.
+
+    Parameters:
+        file_path (str): The path of the file to check.
+
+    Returns:
+        Union[bool, Union[str, None]]: True and the absolute path of the file if it is a local file,
+            False and None if it is not a local file.
+
+    """
+
+    abs_src = os.path.abspath(file_path)
+    is_local = os.path.isfile(abs_src)
+    if is_local:
+        return True, abs_src
+    else:
+        return False, None
+
+
+def is_resolvable(url):
+    """
+    Check if a URL is resolvable using validators library.
+
+    Parameters:
+        url (str): The URL to check if it is resolvable.
+
+    Returns:
+        bool: True if the URL is valid and resolvable, False otherwise.
+
+    """
+    try:
+        # Use validators to check if the URL is valid
+        return validators.url(url)
+    except Exception:
+        return False
 
 def find_project_root(
     marker: Optional[Union[str, list]] = None, file_path: Optional = None

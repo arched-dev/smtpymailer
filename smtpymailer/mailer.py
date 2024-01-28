@@ -506,8 +506,8 @@ class SmtpMailer:
         Creates an HTML version of the email, using the HTML content it converts it to HTML.
 
         It also alters the HTML content based on the specified `alter_img_src` parameter. It either converts image
-        elements in the HTML content to base64 encoding or attaches images as CID from the url in the src attribute of
-        any <img> HTML elements.
+        elements in the HTML content to base64 encoding or attaches images as CID from the value of the src attribute
+        of any <img> HTML elements. They can be local paths or remote URLs.
 
         Args:
             html_content (str): The HTML content of the message.
@@ -552,9 +552,13 @@ class SmtpMailer:
             html_content: Optional. The HTML content of the email, not needed if you are using a template.
             template: Optional. The template file path.
             template_directory: Optional. Either a single template directory or a list of template directories.
-            alter_img_src: Optional. String, can either be 'base64' or 'cid'. If 'base64', any <img> HTML elements with
-            src as a URL will be converted to base64. If 'cid', any <img> HTML elements with src as a URL will be
-            converted to cid. Defaults to None.
+            alter_img_src: Optional. String, can either be 'base64' or 'cid'. Defaults to None.
+
+                * If 'base64', any <img> HTML elements with src as a remote URL or local path will be converted to
+                  base64.
+
+                * If 'cid', any <img> HTML elements with src as a remote URL or local path will be converted to cid.
+
             **kwargs: Additional keyword arguments for the jinja template if needed
 
         Raises:

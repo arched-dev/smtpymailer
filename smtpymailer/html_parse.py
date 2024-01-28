@@ -17,6 +17,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 import html2text
 from PIL import Image
 
+from smtpymailer.utils import is_get_local_file, is_resolvable
+
 
 def check_data_in_html_el(html_content: str):
     """
@@ -101,20 +103,21 @@ def change_image_type(element: "Tag", mime_type: str, img_data: bytes):
             with BytesIO() as img_io:
                 img.convert(pixel_format.upper()).save(img_io, convert_to_type.upper())
                 img_data = img_io.getvalue()  # Update img_data with JPEG data
-                mime_type = f'image/{convert_to_type.lower().replace("jpg","jpeg")}'  # Update content_type to JPEG
+                mime_type = f'image/{convert_to_type.lower().replace("jpg", "jpeg")}'  # Update content_type to JPEG
 
     return img_data, mime_type
 
 
 def process_img_element(
-    img: Tag,
-    idx: int,
-    convert_to_base64: bool = False,
-    email_message: MIMEMultipart = None,
+        img: Tag,
+        idx: int,
+        convert_to_base64: bool = False,
+        email_message: MIMEMultipart = None,
 ):
     """
     Process and manipulate HTML img elements, converting the image to either CID attachments or base64 encoded.
     If the request fails the element is ignored and left with the original src.
+    Checks for the src in the local filesystem and if its a valid url so both local and remote images can be used.
 
     Optionally you can convert the original image type when using CID attachments. See Notes `change_image_type` for
     more information.
@@ -126,46 +129,58 @@ def process_img_element(
         email_message (MIMEMultipart): An instance of the EmailMessage class. If provided, the image will be attached
             to the email message as an inline image.
 
+    Notes:
+        all below are valid examples:
+
+            > <img src="https://www.example.com/image.png" data-convert="jpg" data-format="rgb" />
+
+            > <img src="/home/user/img.jpg" data-convert='png'/>
+
     """
+    img_data = None
 
     src = img.get("src", "")
     content_type, _ = guess_type(src)
 
-    if not src.startswith(("http://", "https://")):
-        return
+    is_local_file, path = is_get_local_file(src)
+    if is_local_file:
+        with open(path, "rb") as f:
+            img_data = f.read()
 
-    try:
-        response = requests.get(src, stream=True)
-        response.raise_for_status()
+    elif is_resolvable(src):
+        try:
+            response = requests.get(src, stream=True)
+            response.raise_for_status()
+            img_data = response.content
+        except requests.RequestException:
+            # if the request fails, ignore the element and leave the original src
+            return
 
-    except requests.RequestException:
-        # if the request fails, ignore the element and leave the original src
-        return
+    if img_data:
 
-    img_data = response.content
-    img_data, content_type = change_image_type(img, content_type, img_data)
+        img_data, content_type = change_image_type(img, content_type, img_data)
 
-    if convert_to_base64:
-        parsed_url = urlparse(src)
-        img_ext = os.path.splitext(parsed_url.path)[1].lstrip(".")
-        base64_data = base64.b64encode(img_data).decode("utf-8")
-        img["src"] = f"data:image/{img_ext};base64,{base64_data}"
-        img["data-smtpymailer"] = ""
+        if convert_to_base64:
+            parsed_url = urlparse(src)
+            img_ext = os.path.splitext(parsed_url.path)[1].lstrip(".")
+            base64_data = base64.b64encode(img_data).decode("utf-8")
+            img["src"] = f"data:image/{img_ext};base64,{base64_data}"
+            img["data-smtpymailer"] = ""
 
-    elif email_message is not None:
-        hash_object = hashlib.md5(img_data)
-        cid = hash_object.hexdigest() + f"{idx}"
-        maintype, subtype = content_type.split("/")
+        elif email_message is not None:
+            hash_object = hashlib.md5(img_data)
+            cid = hash_object.hexdigest() + f"{idx}"
+            maintype, subtype = content_type.split("/")
 
-        # Create an instance of MIMEImage
-        mime_image = MIMEImage(img_data, _subtype=subtype)
-        mime_image.add_header("Content-ID", f"<{cid}>")
-        mime_image.add_header("Content-Disposition", "inline")
+            # Create an instance of MIMEImage
+            mime_image = MIMEImage(img_data, _subtype=subtype)
+            mime_image.add_header("Content-ID", f"<{cid}>")
+            mime_image.add_header("Content-Disposition", "inline")
 
-        # Attach it to the email message
-        email_message.attach(mime_image)
-        img["src"] = f"cid:{cid}"
-        img["data-smtpymailer"] = ""
+            # Attach it to the email message
+            email_message.attach(mime_image)
+            img["src"] = f"cid:{cid}"
+            img["data-smtpymailer"] = ""
 
 
 def convert_img_elements_to_base64(html_content: str) -> str:
@@ -253,10 +268,10 @@ def create_jinja_environment(template_paths: List[str]) -> Environment:
 
 
 def render_html_template(
-    template: str,
-    template_paths: Optional[List[str]] = None,
-    extension: str = "html",
-    **kwargs,
+        template: str,
+        template_paths: Optional[List[str]] = None,
+        extension: str = "html",
+        **kwargs,
 ) -> str:
     """
     Renders an HTML template using Jinja2.
@@ -301,7 +316,7 @@ def render_html_template(
 def alter_img_html(message, html_content, alter_img_src: Optional = None):
     """
     Alters the HTML content of an email message by converting image elements to base64 encoding or attaching images
-    as CID (Content-ID).
+    as CID (Content-ID). The src can be a local file path or a remote url.
 
     This method modifies the HTML content based on the specified `alter_img_src` parameter. It either converts image
     elements in the HTML content to base64 encoding or attaches images as CID.
@@ -339,10 +354,10 @@ def alter_img_html(message, html_content, alter_img_src: Optional = None):
 
 
 def make_html_content(
-    html_content: Optional[str] = None,
-    template: Optional[str] = None,
-    template_directory: Optional[Union[str, List[str]]] = None,
-    **kwargs,
+        html_content: Optional[str] = None,
+        template: Optional[str] = None,
+        template_directory: Optional[Union[str, List[str]]] = None,
+        **kwargs,
 ):
     """
     Adds HTML content to the email message. This function either directly uses provided HTML content or renders HTML content
