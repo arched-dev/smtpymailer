@@ -7,12 +7,8 @@ with open("README.md", "r", encoding='UTF-8') as fh:
 # Reading requirements from requirements.txt
 with open("requirements.txt", "r", encoding='UTF-8') as fh:
     requirements = fh.read().splitlines()
-
-# Development requirements are separate
-dev_requirements = [
-    'coverage~=7.4.1',
-    'coverage-badge~=1.1.0'
-]
+with open("./tests/requirements-test.txt", "r", encoding='UTF-8') as fh:
+    test_requirements = fh.read().splitlines()
 
 setup(
     name="smtpymailer",
@@ -32,7 +28,7 @@ setup(
     python_requires=">=3.7",
     install_requires=requirements,
     extras_require={
-        'dev': dev_requirements
+        'dev': test_requirements
     },
     include_package_data=True,
 )

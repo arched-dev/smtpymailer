@@ -9,4 +9,3 @@ validators~=0.22.0
 html2text~=2020.1.16
 pillow~=10.2.0
 email_validator==2.1.0.post1
-mailinator-python-client-2==0.0.4
