@@ -68,7 +68,7 @@ class TestValidateSendEmail(unittest.TestCase):
         self.unique_id_three = "".join(
             random.choice(string.ascii_letters) for _ in range(10)
         )
-        self.attachments = ["./assets/dog.pdf"]
+        self.attachments = ["./tests/assets/dog.pdf"]
 
     # Generate the random string
 

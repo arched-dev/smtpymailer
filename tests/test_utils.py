@@ -25,7 +25,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEImage object if the attachment is an image
     def test_image(self):
-        path = os.path.abspath("./assets/dog.jpg")
+        path = os.path.abspath("./tests/assets/dog.jpg")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
@@ -33,7 +33,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEApplication object if the attachment is a docx file
     def test_docx(self):
-        path = os.path.abspath("./assets/dog.docx")
+        path = os.path.abspath("./tests/assets/dog.docx")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
@@ -41,7 +41,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEApplication object if the attachment is a xlsx file
     def test_xlsx(self):
-        path = os.path.abspath("./assets/dog.xlsx")
+        path = os.path.abspath("./tests/assets/dog.xlsx")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
@@ -49,7 +49,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEApplication object if the attachment is an ods file
     def test_ods(self):
-        path = os.path.abspath("./assets/dog.ods")
+        path = os.path.abspath("./tests/assets/dog.ods")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
@@ -57,7 +57,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEApplication object if the attachment is an odt file
     def test_odt(self):
-        path = os.path.abspath("./assets/dog.odt")
+        path = os.path.abspath("./tests/assets/dog.odt")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
@@ -65,7 +65,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEApplication object if the attachment is a pdf file
     def test_pdf(self):
-        path = os.path.abspath("./assets/dog.pdf")
+        path = os.path.abspath("./tests/assets/dog.pdf")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
@@ -73,7 +73,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEAudio object if the attachment is a pdf file
     def test_mp3(self):
-        path = os.path.abspath("./assets/dog.mp3")
+        path = os.path.abspath("./tests/assets/dog.mp3")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
@@ -81,7 +81,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEText object if the attachment is a txt file
     def test_txt(self):
-        path = os.path.abspath("./assets/dog.txt")
+        path = os.path.abspath("./tests/assets/dog.txt")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
@@ -89,7 +89,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEApplication object if the attachment is a zip file
     def test_zip(self):
-        path = os.path.abspath("./assets/dog.zip")
+        path = os.path.abspath("./tests/assets/dog.zip")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
@@ -97,7 +97,7 @@ class TestCreateMime(unittest.TestCase):
 
     # Should return a MIMEBase object if the attachment is a mp4 file
     def test_base(self):
-        path = os.path.abspath("./assets/dog.mp4")
+        path = os.path.abspath("./tests/assets/dog.mp4")
         with open(path, "rb") as attachment:
             part = construct_mime_object(path, attachment)
 
