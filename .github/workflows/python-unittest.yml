@@ -40,8 +40,8 @@ jobs:
         coverage-badge -o assets/coverage.svg
     - name: Commit and Push Coverage Badge
       run: |
-        git config --global user.name 'Your Name'
-        git config --global user.email 'your-email@example.com'
+        git config --global user.name 'Lewis Morris'
+        git config --global user.email 'lewis.morris@gmail.com'
         git add tests/assets/coverage.svg
         git commit -m "Update coverage badge"
         git push
