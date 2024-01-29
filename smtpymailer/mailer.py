@@ -235,7 +235,7 @@ class SmtpMailer:
         sender_domain = self.sender.get_domain()
 
         dmarc_records, spf_records, dkim_records = self._query_dns_records(
-            resolver, sender_domain
+            sender_domain
         )
 
         self._validate_records(sender_domain, dmarc_records, spf_records, dkim_records)
