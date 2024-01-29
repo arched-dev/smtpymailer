@@ -4,8 +4,8 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
-from mimetypes import guess_type
 from typing import Union, Optional, List
+import dns.resolver
 
 import pydig
 from dotenv import load_dotenv
@@ -240,10 +240,9 @@ class SmtpMailer:
 
         self._validate_records(sender_domain, dmarc_records, spf_records, dkim_records)
 
-    def _query_dns_records(self, resolver, sender_domain):
+    def _query_dns_records(self, sender_domain):
         """
         Args:
-            resolver: A DNS resolver object that allows querying of DNS records.
             sender_domain: The domain name of the sender for which DNS records need to be queried.
 
         Returns:
@@ -255,17 +254,30 @@ class SmtpMailer:
         Note:
             The returned lists may be empty if no matching DNS records are found.
         """
-        dmarc_records = resolver.query(f"_dmarc.{sender_domain}", "TXT")
-        spf_records = [
-            x for x in resolver.query(f"{sender_domain}", "TXT") if "spf" in x
-        ]
-        dkim_records = [
-            x
-            for x in resolver.query(
-                f"{self.mail_dkim_selector}._domainkey.{sender_domain}", "TXT"
-            )
-            if "DKIM" in x
-        ]
+
+        dmarc_records = []
+        spf_records = []
+        dkim_records = []
+
+        try:
+            dmarc_answers = dns.resolver.resolve(f"_dmarc.{sender_domain}", "TXT")
+            for rdata in dmarc_answers:
+                dmarc_records.extend(rdata.strings)
+
+            spf_answers = dns.resolver.resolve(sender_domain, "TXT")
+            for rdata in spf_answers:
+                if any("spf" in txt.decode() for txt in rdata.strings):
+                    spf_records.extend(rdata.strings)
+
+            dkim_answers = dns.resolver.resolve(f"{self.mail_dkim_selector}._domainkey.{sender_domain}", "TXT")
+            for rdata in dkim_answers:
+                if any("DKIM" in txt.decode() for txt in rdata.strings):
+                    dkim_records.extend(rdata.strings)
+
+        except dns.exception.DNSException as e:
+            # Handle exceptions (e.g., domain not found, no answer, query refused, etc.)
+            print(f"DNS query failed: {e}")
+
         return dmarc_records, spf_records, dkim_records
 
     def _validate_records(
