@@ -249,36 +249,27 @@ class SmtpMailer:
             A tuple of three lists representing the DNS records:
             - dmarc_records: A list of TXT records associated with the "_dmarc" subdomain of the sender domain.
             - spf_records: A list of TXT records that contain "spf" keyword and are associated with the sender domain.
-            - dkim_records: A list of TXT records associated with the DKIM selector and "_domainkey" subdomain of the sender domain.
-
-        Note:
-            The returned lists may be empty if no matching DNS records are found.
+            - dkim_records: A list containing a single string, which is the concatenated DKIM record.
         """
 
         dmarc_records = []
         spf_records = []
-        dkim_records = []
+        dkim_record = ""
 
-        try:
-            dmarc_answers = dns.resolver.resolve(f"_dmarc.{sender_domain}", "TXT")
-            for rdata in dmarc_answers:
-                dmarc_records.extend([x.decode() for x in rdata.strings])
+        dmarc_answers = dns.resolver.resolve(f"_dmarc.{sender_domain}", "TXT")
+        for rdata in dmarc_answers:
+            dmarc_records.append(rdata.strings[0].decode())
 
-            spf_answers = dns.resolver.resolve(sender_domain, "TXT")
-            for rdata in spf_answers:
-                if any("spf" in txt.decode() for txt in rdata.strings):
-                    spf_records.extend([x.decode() for x in rdata.strings])
+        spf_answers = dns.resolver.resolve(sender_domain, "TXT")
+        for rdata in spf_answers:
+            if any("spf" in txt.decode() for txt in rdata.strings):
+                spf_records.append(rdata.strings[0].decode())
 
-            dkim_answers = dns.resolver.resolve(f"{self.mail_dkim_selector}._domainkey.{sender_domain}", "TXT")
-            for rdata in dkim_answers:
-                if any("DKIM" in txt.decode() for txt in rdata.strings):
-                    dkim_records.extend([x.decode() for x in rdata.strings])
+        dkim_answers = dns.resolver.resolve(f"{self.mail_dkim_selector}._domainkey.{sender_domain}", "TXT")
+        for rdata in dkim_answers:
+            dkim_record = ''.join(txt.decode() for txt in rdata.strings)
 
-        except dns.exception.DNSException as e:
-            # Handle exceptions (e.g., domain not found, no answer, query refused, etc.)
-            print(f"DNS query failed: {e}")
-
-        return dmarc_records, spf_records, dkim_records
+        return dmarc_records, spf_records, [dkim_record] if dkim_record else []
 
     def _validate_records(
         self,

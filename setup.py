@@ -12,7 +12,7 @@ with open("./tests/requirements-test.txt", "r", encoding='UTF-8') as fh:
 
 setup(
     name="smtpymailer",
-    version="0.0.6",
+    version="0.0.7",
     author="Lewis Morris",
     author_email="lewis@arched.dev",
     description="A emailing python library for emailing from alternative domains - DNS entries etc need to be assigned (not used for spamming).",
