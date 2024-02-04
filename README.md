@@ -96,4 +96,4 @@ You can send emails from alternative domains by setting up the correct DNS setti
 This project is licensed under the [MIT License](LICENSE).
 
 ## TODO
-- Add support for local files to be changes to CID attachments in the <img> src.
+- Change the way the send function's `alter_img_src` parameter works. It should AUTODETECT img elements with `data-inline` or `data-base` attributes instead.
