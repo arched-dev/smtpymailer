@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Optional, Union, Tuple
 from urllib.parse import urlparse
 
+import validators
+
 from smtpymailer.validation import validate_user_email
 
 def is_get_local_file(file_path: str) -> Tuple[bool, Union[str, None]]:
