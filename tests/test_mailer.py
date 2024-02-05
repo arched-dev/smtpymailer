@@ -16,12 +16,10 @@ from smtpymailer.utils import find_project_root
 class TestContact(unittest.TestCase):
     def test_init_valid_email(self):
         """Test initializing a contact with a valid email."""
-        try:
-            contact = Contact("johndoe@example.com", "John Doe")
-            self.assertEqual(contact.email, "johndoe@example.com")
-            self.assertEqual(contact.name, "John Doe")
-        except EmailNotValidError:
-            self.fail("init() raised EmailNotValidError unexpectedly!")
+        contact = Contact("johndoe@example.com", "John Doe")
+        self.assertEqual(contact.email, "johndoe@example.com")
+        self.assertEqual(contact.name, "John Doe")
+
 
     def test_init_invalid_email(self):
         """Test initializing a contact with an invalid email."""

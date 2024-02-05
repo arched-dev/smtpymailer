@@ -183,12 +183,13 @@ def process_img_element(
             img["data-smtpymailer"] = ""
 
 
-def convert_img_elements_to_base64(html_content: str) -> str:
+def convert_img_elements(html_content: str, email: MIMEMultipart) -> str:
     """
     Converts all img elements in the given HTML content to base64.
 
     Args:
         html_content (str): The HTML content containing img elements.
+        email (MIMEMultipart): An instance of the EmailMessage class.
 
     Returns:
         str: The modified HTML content with img elements converted to base64.
@@ -196,24 +197,10 @@ def convert_img_elements_to_base64(html_content: str) -> str:
     """
     soup = BeautifulSoup(html_content, "html.parser")
     for idx, img in enumerate(soup.find_all("img")):
-        process_img_element(img, idx, convert_to_base64=True)
-    return str(soup)
-
-
-def attach_images_as_cid(html_content: str, msg: MIMEMultipart) -> str:
-    """
-    Attach images as CID to the HTML email content.
-
-    Args:
-        html_content (str): The HTML content of the email.
-        msg (EmailMessage): The email message object to attach the images to.
-
-    Returns:
-        str: The modified HTML content with attached CID images.
-    """
-    soup = BeautifulSoup(html_content, "html.parser")
-    for idx, img in enumerate(soup.find_all("img")):
-        process_img_element(img, idx, email_message=msg)
+        if "data-base" in img.attrs:
+            process_img_element(img, idx, convert_to_base64=True)
+        elif "data-cid" in img.attrs:
+            process_img_element(img, idx, email_message=email)
     return str(soup)
 
 
@@ -312,45 +299,6 @@ def render_html_template(
     html_content = template.render(dated=datetime.datetime.now(), **kwargs)
     return html_content
 
-
-def alter_img_html(message, html_content, alter_img_src: Optional = None):
-    """
-    Alters the HTML content of an email message by converting image elements to base64 encoding or attaching images
-    as CID (Content-ID). The src can be a local file path or a remote url.
-
-    This method modifies the HTML content based on the specified `alter_img_src` parameter. It either converts image
-    elements in the HTML content to base64 encoding or attaches images as CID.
-
-    Args:
-        message (MIMEMultipart): The email message object to be modified.
-        html_content (str): The HTML content of the email.
-        alter_img_src (Optional[str]): The source of the image alteration. It can be "base64" or "cid". If None,
-            no alteration is performed.
-
-    Returns:
-        str: The altered HTML content with image elements modified according to `alter_img_src`.
-
-    Raises:
-        This function does not explicitly raise any exceptions.
-
-    Examples:
-        To do nothing
-        >>> alter_img_html(message, html_content)
-
-        To convert image elements in HTML content to base64 encoding:
-        >>> alter_img_html(message, html_content, alter_img_src="base64")
-
-        To attach images in HTML content as CID:
-        >>> alter_img_html(message, html_content, alter_img_src="cid")
-    """
-
-    if alter_img_src:
-        if alter_img_src.lower() == "base64":
-            html_content = convert_img_elements_to_base64(html_content)
-        elif alter_img_src.lower() == "cid":
-            html_content = attach_images_as_cid(html_content, message)
-
-    return html_content
 
 
 def make_html_content(

@@ -7,11 +7,9 @@ from unittest import mock
 import smtpymailer.html_parse
 from smtpymailer.utils import find_project_root
 from smtpymailer.html_parse import (
-    attach_images_as_cid,
-    convert_img_elements_to_base64,
     check_data_in_html_el,
-    alter_img_html,
     make_html_content,
+    convert_img_elements
 )
 
 
@@ -99,12 +97,12 @@ class TestAttachRemoteImagesAsCid(unittest.TestCase):
             # Call the function with a test HTML string
             if html_content is None:
                 image_elements = "".join(
-                    ['<img src="https://example.com/image.jpg">'] * images
+                    ['<img data-cid src="https://example.com/image.jpg">'] * images
                 )
                 html_content = f"<html><body>{image_elements}</body></html>"
 
             msg = MIMEMultipart()
-            result = attach_images_as_cid(html_content, msg)
+            result = convert_img_elements(html_content, msg)
 
             mock_get.assert_called_with("https://example.com/image.jpg", stream=True)
 
@@ -143,7 +141,7 @@ class TestAttachRemoteImagesAsCid(unittest.TestCase):
         with open("./tests/assets/1px.jpg", "rb") as file:
             jpg_content = file.read()
 
-        html_content = '<html><body><img data-convert="png" data-format="RGB" src="https://example.com/image.jpg"></body></html>'
+        html_content = '<html><body><img data-cid data-convert="png" data-format="RGB" src="https://example.com/image.jpg"></body></html>'
         self.attach_images_as_cid_helper(
             images=1,
             html_content=html_content,
@@ -154,11 +152,11 @@ class TestAttachRemoteImagesAsCid(unittest.TestCase):
     def test_alter_img_html_with_none(self):
         msg = MIMEMultipart()
         html_content = "<html><body></body></html>"
-        html_out = alter_img_html(msg, html_content)
+        html_out = convert_img_elements(html_content, msg)
         self.assertEqual(html_content, html_out)
 
     @mock.patch("requests.get")
-    def test_alter_img_html_with_base(self, mock):
+    def test_alter_img_html_with_base_and_cid(self, mock):
         # Set up the mock response
         mock_response = mock.Mock()
         mock_response.content = b"fake_img_data"
@@ -167,12 +165,16 @@ class TestAttachRemoteImagesAsCid(unittest.TestCase):
 
         msg = MIMEMultipart()
         html_content = (
-            '<html><body><img src="https://example.com/image.jpg"></body></html>'
+            '<html><body><img data-cid src="https://example.com/image.jpg"></body></html>'
         )
-        html_out = alter_img_html(msg, html_content, "cid")
+        html_out = convert_img_elements(html_content, msg)
         self.assertTrue("cid:" in html_out)
 
-        html_out = alter_img_html(msg, html_content, "base64")
+        msg = MIMEMultipart()
+        html_content = (
+            '<html><body><img data-base src="https://example.com/image.jpg"></body></html>'
+        )
+        html_out = convert_img_elements(html_content, msg)
         self.assertTrue(";base64," in html_out)
 
     def test_make_html_content(self):
@@ -197,25 +199,25 @@ class TestAttachRemoteImagesAsCid(unittest.TestCase):
         self.assertNotEqual(html_content, html_out)
 
     def test_convert_cid_image_same_type(self):
-        html_content = '<html><body><img data-convert="jpg" data-format="RGB" src="https://example.com/image.jpg"></body></html>'
+        html_content = '<html><body><img data-cid data-convert="jpg" data-format="RGB" src="https://example.com/image.jpg"></body></html>'
         self.attach_images_as_cid_helper(images=1, html_content=html_content)
 
     def test_fail_convert_cid_type(self):
         with self.assertRaises(ValueError):
-            html_content = '<html><body><img data-convert="webp" data-format="RGB" src="https://example.com/image.jpg"></body></html>'
+            html_content = '<html><body><img data-cid  data-convert="webp" data-format="RGB" src="https://example.com/image.jpg"></body></html>'
             self.attach_images_as_cid_helper(images=1, html_content=html_content)
 
     def test_fail_convert_cid_format(self):
         with self.assertRaises(ValueError):
-            html_content = '<html><body><img data-convert="jpg" data-format="cmyk" src="https://example.com/image.jpg"></body></html>'
+            html_content = '<html><body><img data-cid  data-convert="jpg" data-format="cmyk" src="https://example.com/image.jpg"></body></html>'
             self.attach_images_as_cid_helper(images=1, html_content=html_content)
 
     def test_attach_unavailable_url_cid(self):
         html_content = (
-            '<html><body><img src="htts://example.com/image.jpg"></body></html>'
+            '<html><body><img data-cid src="htts://example.com/image.jpg"></body></html>'
         )
         msg = MIMEMultipart()
-        result = attach_images_as_cid(html_content, msg)
+        result = convert_img_elements(html_content, msg)
 
         self.assertNotIn(f"cid:image0.jpg", result)
 
@@ -241,10 +243,10 @@ class TestConvertRemoteImgElementsToBase64(unittest.TestCase):
 
             # Call the function with a test HTML string
             image_elements = "".join(
-                ['<img src="https://example.com/image.jpg">'] * images
+                ['<img data-base src="https://example.com/image.jpg">'] * images
             )
             html_content = f"<html><body>{image_elements}</body></html>"
-            result = convert_img_elements_to_base64(html_content)
+            result = convert_img_elements(html_content, MIMEMultipart())
 
             converted_data = check_data_in_html_el(result)
 
@@ -261,9 +263,9 @@ class TestConvertRemoteImgElementsToBase64(unittest.TestCase):
 
     def test_attach_unavailable_url_base64(self):
         html_content = (
-            '<html><body><img src="https://example.com/image.jpg"></body></html>'
+            '<html><body><img data-base src="https://example.com/image.jpg"></body></html>'
         )
-        result = convert_img_elements_to_base64(html_content)
+        result = convert_img_elements(html_content, MIMEMultipart())
 
         converted_data = check_data_in_html_el(result)
 
@@ -272,8 +274,8 @@ class TestConvertRemoteImgElementsToBase64(unittest.TestCase):
         self.assertEqual(converted_data["data-smtpymailer"], 0)
 
     def test_attach_invalid_url_base64(self):
-        html_content = '<html><body><img src="example.com/image.jpg"></body></html>'
-        result = convert_img_elements_to_base64(html_content)
+        html_content = '<html><body><img data-base src="example.com/image.jpg"></body></html>'
+        result = convert_img_elements(html_content, MIMEMultipart())
 
         converted_data = check_data_in_html_el(result)
 
@@ -289,8 +291,8 @@ class TestConvertLocalImgElementsToBase64(unittest.TestCase):
             return base64.b64encode(image_file.read()).decode('utf-8')
 
     def test_convert_single_image_to_base64(self):
-        html_content = '<html><body><img src="./tests/assets/dog.jpg"></body></html>'
-        result = convert_img_elements_to_base64(html_content)
+        html_content = '<html><body><img data-base src="./tests/assets/dog.jpg"></body></html>'
+        result = convert_img_elements(html_content, MIMEMultipart())
 
         # Assuming the function replaces the src attribute with the base64 data
         expected_base64_data = self.read_image_base64('./tests/assets/dog.jpg')
@@ -298,8 +300,8 @@ class TestConvertLocalImgElementsToBase64(unittest.TestCase):
 
     def test_attach_invalid_url_base64(self):
         # This test checks if the function properly handles invalid image paths
-        html_content = '<html><body><img src="invalid_path/dog.jpg"></body></html>'
-        result = convert_img_elements_to_base64(html_content)
+        html_content = '<html><body><img data-base src="invalid_path/dog.jpg"></body></html>'
+        result = convert_img_elements(html_content, MIMEMultipart())
 
         # Assuming the function leaves the src attribute unchanged if the image can't be read
         self.assertIn('src="invalid_path/dog.jpg"', result)
@@ -316,12 +318,12 @@ class TestAttachLocalImagesAsCid(unittest.TestCase):
 
         if html_content is None:
             image_elements = "".join(
-                ['<img src="./tests/assets/dog.jpg">'] * images
+                ['<img data-cid src="./tests/assets/dog.jpg">'] * images
             )
             html_content = f"<html><body>{image_elements}</body></html>"
 
         msg = MIMEMultipart()
-        result = attach_images_as_cid(html_content, msg)
+        result = convert_img_elements(html_content, msg)
 
         cid_hash = hashlib.md5(fake_content_match).hexdigest()
         for i in range(images):

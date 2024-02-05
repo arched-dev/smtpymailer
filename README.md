@@ -13,7 +13,7 @@ emails from your own mail server but the sender is an alternative domain.
 - Validates DNS settings like DKIM, DMARC, and SPF before sending emails to avoid being marked as spam.
 - Full email functionality including `To`, `CC`, `BCC`, `Reply-To`, and attachments.
 - Adds attachments with the correct MIME type.
-- Optionally converts url <img> tags to inline attachments CID attachments or Base64 encoded img sources.
+- Optionally converts url <img> tags to inline attachments CID attachments or Base64 encoded img sources, this is controlled by data attributes `data-inline` or `data-base` in the img tag.
 - Supports sending string HTML content, Jinja templates, or plain html files.
 - Automatically converts HTML to plain text for email clients that do not support HTML.
 - Supports environment variables and `.env` files for mail server settings.
@@ -66,7 +66,6 @@ Use the `send_email` method to send emails:
 - `html_content`: (Optional) HTML content of the email (not required if using a template)
 - `template`: (Optional) Template file path (using jinja), it can be just a plain html file.
 - `template_directory`: (Optional) Single or list of template directories.
-- `alter_img_src`: (Optional) String to download and convert img src to base64 encoded strings (either cid|base64).
 - `**kwargs`: Additional arguments for jinja template, if needed.
 
 ### Example
@@ -97,3 +96,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## TODO
 - Change the way the send function's `alter_img_src` parameter works. It should AUTODETECT img elements with `data-inline` or `data-base` attributes instead.
+****

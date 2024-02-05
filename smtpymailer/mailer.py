@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 
 from smtpymailer.html_parse import (
     convert_html_to_plain_text,
-    alter_img_html,
-    make_html_content,
+    convert_img_elements,
+    make_html_content
 )
 from smtpymailer.utils import (
     is_file_with_path,
@@ -504,25 +504,22 @@ class SmtpMailer:
         msg_text = MIMEText(plain_html, "plain")
         self.message_alt.attach(msg_text)
 
-    def _make_html_message(self, html_content: str, alter_img_src: str):
+    def _make_html_message(self, html_content: str):
         """
         Creates an HTML version of the email, using the HTML content it converts it to HTML.
 
-        It also alters the HTML content based on the specified `alter_img_src` parameter. It either converts image
-        elements in the HTML content to base64 encoding or attaches images as CID from the value of the src attribute
-        of any <img> HTML elements. They can be local paths or remote URLs.
+        It may also alter the HTML content based on data attributes specified in the img tags.
 
         Args:
             html_content (str): The HTML content of the message.
-            alter_img_src (str): Flag indicating whether to alter image src attributes, can be 'base64' or 'cid'.
 
         Notes:
             This method sets the class attribute `message_alt` to a MIMEMultipart object containing the HTML
             version of the email.
 
         """
-        if alter_img_src:
-            html_content = alter_img_html(self.message, html_content, alter_img_src)
+
+        html_content = convert_img_elements(html_content, self.message)
 
         # create html email
         msg_html = MIMEText(html_content, "html")
@@ -539,11 +536,16 @@ class SmtpMailer:
         html_content: Optional = None,
         template: Optional = None,
         template_directory: Optional[Union[str, list]] = None,
-        alter_img_src: Optional[str] = None,
         **kwargs,
     ):
         """
-        Sends an email with the given parameters.
+        Sends an email with the given parameters. The email can be sent with either HTML content or a Jinja template.
+
+        You can convert image src's (files or URLs) to base64 embedded images or attach them as CID images in the email.
+        This can easily be achieved by adding a data attribute to the image.
+
+            - `data-cid` will convert the image to a CID image and attach to the email inline.
+            - `data-base` will convert the image to a base64 embedded image.
 
         Args:
             recipients: Either a single recipient email address or a list of email addresses.
@@ -555,13 +557,6 @@ class SmtpMailer:
             html_content: Optional. The HTML content of the email, not needed if you are using a template.
             template: Optional. The template file path.
             template_directory: Optional. Either a single template directory or a list of template directories.
-            alter_img_src: Optional. String, can either be 'base64' or 'cid'. Defaults to None.
-
-                * If 'base64', any <img> HTML elements with src as a remote URL or local path will be converted to
-                  base64.
-
-                * If 'cid', any <img> HTML elements with src as a remote URL or local path will be converted to cid.
-
             **kwargs: Additional keyword arguments for the jinja template if needed
 
         Raises:
@@ -573,6 +568,7 @@ class SmtpMailer:
 
         Returns:
             True if the email was sent successfully, otherwise raises an Exception.
+
 
         """
 
@@ -602,7 +598,7 @@ class SmtpMailer:
         )
 
         self._make_plain_message(html_content)
-        self._make_html_message(html_content, alter_img_src)
+        self._make_html_message(html_content)
         self._add_attachments(attachments)
 
         return self._send_message(all_recipients)
