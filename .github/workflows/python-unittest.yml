@@ -44,4 +44,5 @@ jobs:
         git config --global user.email 'lewis@arched.dev'
         git add ./tests/assets/coverage.svg
         git commit -m "Update coverage badge"
-        git push
+        git -c http.extraHeader="AUTHORIZATION: basic $(echo -n x-access-token:${{ secrets.PUSH_KEY }} | base64)" push
+
