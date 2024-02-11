@@ -119,72 +119,30 @@ edit `InternalHosts` and add a new line (i.e /etc/opendkim/trusted.hosts)
 sudo systemctl restart opendkim
 ```
 
+### Virtual Domains 
 
-### Configure SASL
+You will need to virtual domains setup on your postfix server to send from different domains than your host name.
 
-To enable Postfix to send emails from alternative domains on your server, configuring SASL 
-(Simple Authentication and Security Layer) is essential. SASL enhances security by allowing Postfix to 
-authenticate against a designated authentication server, ensuring that only authorized users can send emails. 
-This setup is particularly important when your server handles multiple domains, as it maintains distinct 
-authentication for each domain. Proper SASL configuration prevents misuse of your mail server and helps in 
-maintaining a good sending reputation, crucial for email deliverability and avoiding spam filters.
+#### /etc/postfix/sender_login_maps
+```
+@domain.co.uk myuser
+@another_domain.co.uk myuser
+@some_other_domain.co.uk myuser
 
-```bash
-sudo apt-get install libsasl2-modules
 ```
 
-Edit `/etc/postfix/main.cf` and add the following lines:
+Then map it to postfix with the below 
 
-```text
-smtpd_sasl_auth_enable = yes
-smtpd_sasl_security_options = noanonymous, noplaintext
-smtpd_sasl_local_domain = $myhostname
-smtpd_sender_login_maps = hash:/etc/postfix/sender_login_maps
 ```
-Create the SASL config file '/etc/postfix/sasl/smtpd.conf' and add the following lines:
-
-```text
-pwcheck_method: saslauthd
-mech_list: PLAIN LOGIN
-```
-
-Edit `/etc/default/saslauthd` and add the following lines to start the daemon on boot:
-
-```text
-START=yes
-```
-
-Start the SASL daemon:
-
-```bash
-sudo systemctl start saslauthd
-sudo systemctl enable saslauthd
-```
-
-Create the file `/etc/postfix/sender_login_maps` this will map the email address to the username and password for SASL.
-
-The first section is the email you want to send from (not your domain) and the second is the username who you will 
-be logging into the mail server as (which you will have set up while configuring postfix)
-
-```text
-@foo.co.uk bar
-@foobarr.co.uk barfoo
-```
-
-Remap the sender login maps like to the db with the following command:
-
-```bash
 sudo postmap /etc/postfix/sender_login_maps
-````
-
-Restart postfix:
-
-```bash
-sudo systemctl restart postfix
 ```
 
+Restart postfix
 
+```
+sudo systemctl restart postfix
 
+```
 
 ## Validation
 

@@ -3,11 +3,9 @@ import datetime
 import hashlib
 import os
 import re
-import uuid
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from io import BytesIO
-from mimetypes import guess_type
 from typing import Optional, List, Union
 from urllib.parse import urlparse
 import requests
@@ -17,7 +15,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 import html2text
 from PIL import Image
 
-from smtpymailer.utils import is_get_local_file, is_resolvable
+from smtpymailer.utils import is_get_local_file, is_resolvable, guess_type_by_extension
 
 
 def check_data_in_html_el(html_content: str):
@@ -140,7 +138,7 @@ def process_img_element(
     img_data = None
 
     src = img.get("src", "")
-    content_type, _ = guess_type(src)
+    content_type = guess_type_by_extension(src)
 
     is_local_file, path = is_get_local_file(src)
     if is_local_file:
