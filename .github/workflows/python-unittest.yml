@@ -43,6 +43,6 @@ jobs:
       run: |
         git config --global user.name 'Lewis Morris'
         git config --global user.email 'lewis@arched.dev'
-        git add tests/assets/coverage.svg
+        git add ./tests/assets/coverage.svg
         git commit -m "Update coverage badge"
         git push
