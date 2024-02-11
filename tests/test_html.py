@@ -135,11 +135,19 @@ class TestAttachRemoteImagesAsCid(unittest.TestCase):
         self.attach_images_as_cid_helper(images=10)
 
     def test_convert_cid_image_different_type(self):
-        with open("./tests/assets/1px.png", "rb") as file:
-            png_content = file.read()
+        files = ["./tests/assets/1px.png", "../tests/assets/1px.png", "./smtpymailer/tests/assets/1px.png"]
+        for file in files:
+            if os.path.isfile(file):
+                with open(file, "rb") as file:
+                    png_content = file.read()
+                break
 
-        with open("./tests/assets/1px.jpg", "rb") as file:
-            jpg_content = file.read()
+        files = ["./tests/assets/1px.jpg", "../tests/assets/1px.jpg", "./smtpymailer/tests/assets/1px.jpg"]
+        for file in files:
+            if os.path.isfile(file):
+                with open(file, "rb") as file:
+                    png_content = file.read()
+
 
         html_content = '<html><body><img data-cid data-convert="png" data-format="RGB" src="https://example.com/image.jpg"></body></html>'
         self.attach_images_as_cid_helper(
