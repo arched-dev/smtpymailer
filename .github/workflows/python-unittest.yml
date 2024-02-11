@@ -37,8 +37,7 @@ jobs:
       run: |
         coverage run -m unittest discover
         coverage xml
-        mkdir -p assets  # Ensure the assets directory exists
-        coverage-badge -o assets/coverage.svg
+        coverage-badge -o ./tests/assets/coverage.svg
     - name: Commit and Push Coverage Badge
       run: |
         git config --global user.name 'Lewis Morris'
