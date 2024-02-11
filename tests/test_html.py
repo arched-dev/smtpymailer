@@ -146,7 +146,7 @@ class TestAttachRemoteImagesAsCid(unittest.TestCase):
         for file in files:
             if os.path.isfile(file):
                 with open(file, "rb") as file:
-                    png_content = file.read()
+                    jpg_content = file.read()
 
 
         html_content = '<html><body><img data-cid data-convert="png" data-format="RGB" src="https://example.com/image.jpg"></body></html>'
