@@ -1,6 +1,5 @@
 pytest
 email-validator
-unittest
 mailinator-python-client-2==0.0.4
 coverage
 coverage-badge
