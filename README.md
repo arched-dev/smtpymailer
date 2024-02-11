@@ -1,6 +1,8 @@
 
 # smtpymailer
 
+[![Python Unittest](https://github.com/Arched-dev/smtpymailer/actions/workflows/python-unittest.yml/badge.svg)](https://github.com/Arched-dev/smtpymailer/actions/workflows/python-unittest.yml)
+
 ## Introduction
 `smtpymailer` is a versatile Python library designed to simplify the process of sending emails in python. It supports
 and validates DKIM, DMARC, and SPF records before sending emails to avoid being marked as spam, so it is ideal for sending 
