@@ -1,7 +1,11 @@
 
 # smtpymailer
 
-[![Python Unittest](https://github.com/Arched-dev/smtpymailer/actions/workflows/python-unittest.yml/badge.svg)](https://github.com/Arched-dev/smtpymailer/actions/workflows/python-unittest.yml)
+[![Python Unittest](https://github.com/arched-dev/smtpymailer/actions/workflows/main.yml/badge.svg)](https://github.com/arched-dev/smtpymailer/actions/workflows/main.yml)
+
+[![Python Coverage](https://github.com/arched-dev/smtpymailer/tests/assets/coverage.svg)](https://github.com/arched-dev/smtpymailer/actions/workflows/main.yml)
+
+
 
 ## Introduction
 `smtpymailer` is a versatile Python library designed to simplify the process of sending emails in python. It supports
