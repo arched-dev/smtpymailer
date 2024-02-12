@@ -3,7 +3,7 @@
 
 [![Python Unittest](https://github.com/arched-dev/smtpymailer/actions/workflows/main.yml/badge.svg)](https://github.com/arched-dev/smtpymailer/actions/workflows/main.yml)
 
-[![Python Coverage](https://github.com/arched-dev/smtpymailer/tests/assets/coverage.svg)](https://github.com/arched-dev/smtpymailer/actions/workflows/main.yml)
+[![Python Coverage](https://github.com/arched-dev/smtpymailer/blob/master/tests/assets/coverage.svg)](https://github.com/arched-dev/smtpymailer/actions/workflows/main.yml)
 
 
 
