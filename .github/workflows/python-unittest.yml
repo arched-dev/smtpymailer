@@ -38,11 +38,17 @@ jobs:
         coverage run -m unittest discover
         coverage xml
         coverage-badge -o ./tests/assets/coverage.svg
+    # After generating the coverage badge
     - name: Commit and Push Coverage Badge
-      run: |
-        git config --global user.name 'Lewis Morris'
-        git config --global user.email 'lewis@arched.dev'
-        git add ./tests/assets/coverage.svg
-        git commit -m "Update coverage badge"
-        git -c http.extraHeader="AUTHORIZATION: basic $(echo -n x-access-token:${{ secrets.PUSH_KEY }} | base64)" push
-
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: Update coverage badge
+        file_pattern: tests/assets/coverage.svg
+        commit_options: '--no-verify'
+        repository: .
+        branch: ${{ github.ref }}
+        commit_user_name: Lewis Morris
+        commit_user_email: lewis@arched.dev
+        commit_author: Lewis Morris <lewis@arched.dev>
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
