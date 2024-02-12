@@ -46,4 +46,4 @@ jobs:
         commit_message: Update coverage badge
         file_pattern: tests/assets/coverage.svg
         commit_options: '--no-verify'
-        branch: main
+        branch: master
