@@ -24,6 +24,9 @@ jobs:
         pip install -r ./tests/requirements-test.txt
         pip install coverage coverage-badge
 
+    - name: Remove existing coverage badge
+      run: rm -f ./tests/assets/coverage.svg
+
     - name: Run Unittests and Generate Coverage Report
       env:
         MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
